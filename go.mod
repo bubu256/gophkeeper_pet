@@ -1,4 +1,4 @@
-module gophkeeper
+module github.com/bubu256/gophkeeper_pet
 
 go 1.19
 
