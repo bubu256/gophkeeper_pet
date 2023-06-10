@@ -109,7 +109,7 @@ func addData(client pb.GophKeeperServiceClient) (*pb.AddDataResponse, error) {
 		Data: []*pb.MemoryCell{
 			{
 				Info: &pb.InfoCell{
-					Id:          "data-id-1",
+					Id:          1,
 					DataType:    "sample-data-type",
 					DataSize:    1024,
 					Description: "Sample data description",
@@ -133,7 +133,7 @@ func addData(client pb.GophKeeperServiceClient) (*pb.AddDataResponse, error) {
 
 func retrieveData(client pb.GophKeeperServiceClient) (*pb.RetrieveDataResponse, error) {
 	request := &pb.RetrieveDataRequest{
-		Id: []string{"data-id-1"},
+		Id: []int32{1},
 	}
 
 	response, err := client.RetrieveData(context.Background(), request)

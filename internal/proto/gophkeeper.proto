@@ -31,7 +31,7 @@ message AuthorizationResponse {
 }
 
 message InfoCell {
-  string id = 1;
+  int32 id = 1;
   string dataType = 2;
   int32 dataSize = 3;
   string description = 4;
@@ -51,11 +51,11 @@ message AddDataRequest {
 }
 
 message AddDataResponse {
-  repeated string id = 1;
+  repeated int32 id = 1;
 }
 
 message RetrieveDataRequest {
-  repeated string id = 1;
+  repeated int32 id = 1;
 }
 
 message RetrieveDataResponse {

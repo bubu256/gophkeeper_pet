@@ -84,7 +84,7 @@ func (h *HandlerService) AddData(ctx context.Context, request *pb.AddDataRequest
 	log.Printf("Data: %v", request.Data)
 
 	response := &pb.AddDataResponse{
-		Id: []string{"data-id-1", "data-id-2"},
+		Id: []int32{1, 2},
 	}
 
 	return response, nil
@@ -99,7 +99,7 @@ func (h *HandlerService) RetrieveData(ctx context.Context, request *pb.RetrieveD
 		Data: []*pb.MemoryCell{
 			{
 				Info: &pb.InfoCell{
-					Id:          "data-id-1",
+					Id:          1,
 					DataType:    "sample-data-type",
 					DataSize:    1024,
 					Description: "Sample data description",
@@ -123,7 +123,7 @@ func (h *HandlerService) GetInformation(ctx context.Context, request *pb.GetInfo
 	response := &pb.GetInformationResponse{
 		Info: []*pb.InfoCell{
 			{
-				Id:          "data-id-1",
+				Id:          1,
 				DataType:    "sample-data-type",
 				DataSize:    1024,
 				Description: "Sample data description",
