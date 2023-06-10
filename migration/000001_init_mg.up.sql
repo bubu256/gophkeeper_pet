@@ -27,3 +27,21 @@ CREATE TABLE IF NOT EXISTS memory_cells (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (info_id) REFERENCES info_cells (id)
 );
+
+-- Вставка тестовых данных в таблицу пользователей
+INSERT INTO users (username, password_hash)
+VALUES
+  ('john.doe', 'password_hash_1'),
+  ('jane.smith', 'password_hash_2');
+
+-- Вставка тестовых данных в таблицу информационных ячеек
+INSERT INTO info_cells (data_type, data_size, description, owner_id)
+VALUES
+  ('data_type_1', 1024, 'Description 1', 1),
+  ('data_type_2', 2048, 'Description 2', 2);
+
+-- Вставка тестовых данных в таблицу ячеек памяти
+INSERT INTO memory_cells (info_id, encrypted, key_value_pairs, binary_data, file_name)
+VALUES
+  (1, FALSE, '{"key1": "value1", "key2": "value2"}', E'\\x0123456789ABCDEF', 'file1.txt'),
+  (2, TRUE, '{"key3": "value3", "key4": "value4"}', E'\\xAABBCCDDEEFF', 'file2.txt');

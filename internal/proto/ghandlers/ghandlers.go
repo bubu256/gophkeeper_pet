@@ -29,7 +29,6 @@ type HandlerService struct {
 }
 
 // New создает новый объект HandlerService и возвращает ссылку на grpc.Server.
-// func New(businessLogic Goph, serverConfig config.ServerConfig) *grpc.Server {
 func New(serverConfig config.ServerConfig) *grpc.Server {
 	handler := &HandlerService{
 		// businessLogic: businessLogic,

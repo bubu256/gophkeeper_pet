@@ -9,29 +9,33 @@ import (
 
 	"github.com/bubu256/gophkeeper_pet/config"
 	"github.com/bubu256/gophkeeper_pet/internal/proto/ghandlers"
+	"github.com/bubu256/gophkeeper_pet/pkg/storage"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	// Создание объекта реализующего бизнес-логику приложения
-	// businessLogic := NewBusinessLogic() // Замените на вашу реализацию
+	godotenv.Load()
 
-	// Создание серверной конфигурации gRPC
-	serverConfig := config.ServerConfig{
-		// Добавьте необходимые опции сервера
-	}
-
-	// Создание нового gRPC сервера с использованием объекта реализации бизнес-логики
-	server := ghandlers.New(serverConfig)
-
-	// Запуск сервера на заданном порту
-	port := 50051
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	cfg, err := config.GetServerConfig()
 	if err != nil {
-		log.Fatalf("Failed to listen on port %d: %v", port, err)
+		log.Fatalf("configuration loading failed %v", err)
 	}
-	log.Printf("Server is listening on port %d", port)
+	db, err := storage.New(cfg)
+	if err != nil {
+		log.Fatalf("Storage creation failed %v", err)
+	}
 
-	// Запуск сервера в отдельной goroutine
+	server := ghandlers.New(cfg)
+
+	// Запуск сервера
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.Port))
+	if err != nil {
+		log.Fatalf("Failed to listen on port %s: %v", cfg.Port, err)
+	}
+	log.Printf("Server is listening on port %s", cfg.Port)
+
+	// Запуск grpc сервера в отдельной goroutine
 	go func() {
 		if err := server.Serve(lis); err != nil {
 			log.Fatalf("Failed to serve: %v", err)
