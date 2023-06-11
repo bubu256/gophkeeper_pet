@@ -143,6 +143,12 @@ func (s *StoragePG) GetUserDataInfo(userID int64) ([]*schema.InfoCell, error) {
 
 // GetDataByInfoIDs возвращает данные, соответствующие заданным InfoID.
 func (s *StoragePG) GetDataByInfoIDs(infoIDs []int64) ([]*schema.MemoryCell, error) {
+	memoryCells := make([]*schema.MemoryCell, 0, len(infoIDs))
+
+	if len(infoIDs) == 0 {
+		return memoryCells, nil
+	}
+
 	query := `
 			SELECT m.id, m.info_id, m.encrypted, m.key_value_pairs, m.binary_data, m.file_name,
 				i.data_type, i.data_size, i.description, i.owner_id
@@ -156,8 +162,6 @@ func (s *StoragePG) GetDataByInfoIDs(infoIDs []int64) ([]*schema.MemoryCell, err
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
 	defer rows.Close()
-
-	var memoryCells []*schema.MemoryCell
 
 	for rows.Next() {
 		memoryCell := &schema.MemoryCell{}

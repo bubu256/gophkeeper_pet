@@ -7,7 +7,6 @@ require (
 	github.com/jackc/pgconn v1.14.0
 	github.com/jackc/pgx/v4 v4.18.1
 	github.com/joho/godotenv v1.5.1
-	github.com/rs/zerolog v1.15.0
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 	google.golang.org/grpc v1.55.0
 	google.golang.org/protobuf v1.30.0

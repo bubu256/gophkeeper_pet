@@ -9,6 +9,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"errors"
+
 	"github.com/bubu256/gophkeeper_pet/config"
 	"github.com/bubu256/gophkeeper_pet/internal/schema"
 	"github.com/bubu256/gophkeeper_pet/pkg/keeper"
@@ -102,8 +104,6 @@ func (g *GophLogic) GetUserIDFromToken(token string) (int64, error) {
 func (g *GophLogic) CreateUser(username, password string) error {
 	hashedPassword := hashPassword(password)
 
-	// hashedUsername := hashUsername(username)
-
 	user := &schema.User{
 		Username: username,
 		Password: hashedPassword,
@@ -152,7 +152,6 @@ func (g *GophLogic) Authenticate(username, password string) (string, error) {
 }
 
 // SaveData сохраняет новые данные для пользователя.
-// Вызывает соответствующий метод Keeper для записи данных в базу данных.
 func (g *GophLogic) SaveData(userID int64, memoryCell *schema.MemoryCell) (int64, error) {
 	memoryCell.InfoCell.OwnerID = userID
 	// log.Printf("infoCell: %+v", memoryCell.InfoCell)
@@ -165,7 +164,6 @@ func (g *GophLogic) SaveData(userID int64, memoryCell *schema.MemoryCell) (int64
 }
 
 // GetUserData возвращает информацию о данных пользователя.
-// Вызывает метод Keeper для получения данных из базы данных.
 func (g *GophLogic) GetUserDataInfo(userID int64) ([]*schema.InfoCell, error) {
 	infoCells, err := g.keeper.GetUserDataInfo(userID)
 	if err != nil {
@@ -200,8 +198,13 @@ func (g *GophLogic) GetUserMemoryData(userID int64, infoIDs []int64) ([]*schema.
 		}
 	}
 
+	memoryCells := make([]*schema.MemoryCell, 0)
 	// Получаем данные MemoryCell по отфильтрованным ID
-	memoryCells, err := g.keeper.GetDataByInfoIDs(filteredInfoIDs)
+	if len(filteredInfoIDs) == 0 {
+		return memoryCells, errors.New("no data")
+	}
+
+	memoryCells, err = g.keeper.GetDataByInfoIDs(filteredInfoIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve user memory cells: %w", err)
 	}

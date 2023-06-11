@@ -46,9 +46,6 @@ func main() {
 	// }
 	// log.Printf("Authorization Response: %+v", authorizationResponse.Success)
 
-	// Создание клиента и вызов метода с передачей контекста с метаданными
-	client = pb.NewGophKeeperServiceClient(conn)
-
 	addDataResponse, err := addData(client, token)
 	if err != nil {
 		log.Fatalf("Failed to add data: %v", err)
@@ -57,21 +54,21 @@ func main() {
 
 	retrieveDataResponse, err := retrieveData(client, token)
 	if err != nil {
-		log.Fatalf("Failed to retrieve data: %v", err)
+		log.Printf("Failed to retrieve data: %v", err)
 	}
 	log.Printf("RetrieveData Response: %v", retrieveDataResponse)
 
 	getInformationResponse, err := getInformation(client, token)
 	if err != nil {
-		log.Fatalf("Failed to get information: %v", err)
+		log.Printf("Failed to get information: %v", err)
 	}
 	log.Printf("GetInformation Response: %v", getInformationResponse)
 }
 
 func registerUser(client pb.GophKeeperServiceClient) (*pb.RegistrationResponse, error) {
 	request := &pb.RegistrationRequest{
-		Username: "example_user3",
-		Password: "password123",
+		Username: "test_user",
+		Password: "234",
 	}
 
 	response, err := client.Register(context.Background(), request)
@@ -84,8 +81,8 @@ func registerUser(client pb.GophKeeperServiceClient) (*pb.RegistrationResponse, 
 
 func authenticateUser(client pb.GophKeeperServiceClient) (*pb.AuthenticationResponse, error) {
 	request := &pb.AuthenticationRequest{
-		Username: "example_user3",
-		Password: "password123",
+		Username: "test_user",
+		Password: "234",
 	}
 
 	response, err := client.Authenticate(context.Background(), request)
@@ -136,7 +133,7 @@ func addData(client pb.GophKeeperServiceClient, token string) (*pb.AddDataRespon
 
 func retrieveData(client pb.GophKeeperServiceClient, token string) (*pb.RetrieveDataResponse, error) {
 	request := &pb.RetrieveDataRequest{
-		Ids: []int64{13},
+		Ids: []int64{140},
 	}
 
 	response, err := client.RetrieveData(SetTokenContext(context.Background(), token), request)
