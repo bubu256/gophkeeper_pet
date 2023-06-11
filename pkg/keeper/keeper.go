@@ -1,4 +1,4 @@
-package storage
+package keeper
 
 import (
 	"context"
@@ -12,11 +12,26 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
+// Keeper представляет интерфейс для взаимодействия с базой данных.
+type Keeper interface {
+	GetUserDataInfo(userID int64) ([]*schema.InfoCell, error)
+	GetDataByInfoIDs(infoIDs []int64) ([]*schema.MemoryCell, error)
+	UpdateMemoryCell(memoryCell schema.MemoryCell) (bool, error)
+	UpdateInfoCell(infoCell schema.InfoCell) (bool, error)
+	AddData(infoCell schema.InfoCell, memoryCell schema.MemoryCell) error
+	DeleteData(infoIDs []int64) (bool, error)
+	GetUserByUsername(username string) (*schema.User, error)
+	CreateUser(user *schema.User) error
+	Ping() error
+}
+
 // StoragePG представляет хранилище данных PostgreSQL.
 type StoragePG struct {
 	db  *pgxpool.Pool
 	cfg config.ServerConfig
 }
+
+var _ Keeper = &StoragePG{}
 
 // New создает новый экземпляр StoragePG и устанавливает соединение с базой данных.
 func New(cfg config.ServerConfig) (*StoragePG, error) {
@@ -40,13 +55,60 @@ func New(cfg config.ServerConfig) (*StoragePG, error) {
 	return storage, nil
 }
 
-// GetUserSavedDataInfo возвращает информацию о всех сохраненных данных пользователя по его ID.
-func (s *StoragePG) GetUserSavedDataInfo(userID int64) ([]*schema.InfoCell, error) {
+// GetUserByUsername возвращает пользователя по его имени пользователя (username).
+func (s *StoragePG) GetUserByUsername(username string) (*schema.User, error) {
 	query := `
-		SELECT id, data_type, data_size, description, owner_id
-		FROM info_cell
-		WHERE owner_id = $1
-	`
+			SELECT id, username, password
+			FROM users
+			WHERE username = $1
+		`
+
+	row := s.db.QueryRow(context.Background(), query, username)
+
+	user := &schema.User{}
+	err := row.Scan(
+		&user.ID,
+		&user.Username,
+		&user.Password,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to scan row: %w", err)
+	}
+
+	return user, nil
+}
+
+// CreateUser создает нового пользователя.
+func (s *StoragePG) CreateUser(user *schema.User) error {
+	query := `
+			INSERT INTO users (username, password)
+			VALUES ($1, $2)
+			RETURNING id
+		`
+
+	err := s.db.QueryRow(
+		context.Background(),
+		query,
+		user.Username,
+		user.Password,
+	).Scan(&user.ID)
+	if err != nil {
+		return fmt.Errorf("failed to execute insert query: %w", err)
+	}
+
+	return nil
+}
+
+// GetUserSavedDataInfo возвращает информацию о всех сохраненных данных пользователя по его ID.
+func (s *StoragePG) GetUserDataInfo(userID int64) ([]*schema.InfoCell, error) {
+	query := `
+			SELECT id, data_type, data_size, description, owner_id
+			FROM info_cells
+			WHERE owner_id = $1
+		`
 
 	rows, err := s.db.Query(context.Background(), query, userID)
 	if err != nil {
@@ -82,12 +144,12 @@ func (s *StoragePG) GetUserSavedDataInfo(userID int64) ([]*schema.InfoCell, erro
 // GetDataByInfoIDs возвращает данные, соответствующие заданным InfoID.
 func (s *StoragePG) GetDataByInfoIDs(infoIDs []int64) ([]*schema.MemoryCell, error) {
 	query := `
-		SELECT m.id, m.info_id, m.encrypted, m.key_value_pairs, m.binary_data, m.file_name,
-			i.data_type, i.data_size, i.description, i.owner_id
-		FROM memory_cell m
-		INNER JOIN info_cell i ON m.info_id = i.id
-		WHERE i.id = ANY($1)
-	`
+			SELECT m.id, m.info_id, m.encrypted, m.key_value_pairs, m.binary_data, m.file_name,
+				i.data_type, i.data_size, i.description, i.owner_id
+			FROM memory_cells m
+			INNER JOIN info_cells i ON m.info_id = i.id
+			WHERE i.id = ANY($1)
+		`
 
 	rows, err := s.db.Query(context.Background(), query, infoIDs)
 	if err != nil {
@@ -129,12 +191,12 @@ func (s *StoragePG) GetDataByInfoIDs(infoIDs []int64) ([]*schema.MemoryCell, err
 }
 
 // UpdateMemoryCell обновляет данные ячейки памяти на основе InfoID.
-func (s *StoragePG) UpdateMemoryCell(memoryCell *schema.MemoryCell) (bool, error) {
+func (s *StoragePG) UpdateMemoryCell(memoryCell schema.MemoryCell) (bool, error) {
 	query := `
-		UPDATE memory_cell
-		SET encrypted = $1, key_value_pairs = $2, binary_data = $3, file_name = $4
-		WHERE info_id = $5
-	`
+			UPDATE memory_cells
+			SET encrypted = $1, key_value_pairs = $2, binary_data = $3, file_name = $4
+			WHERE info_id = $5
+		`
 
 	result, err := s.db.Exec(
 		context.Background(),
@@ -158,12 +220,12 @@ func (s *StoragePG) UpdateMemoryCell(memoryCell *schema.MemoryCell) (bool, error
 }
 
 // UpdateInfoCell обновляет данные информационной ячейки на основе ID.
-func (s *StoragePG) UpdateInfoCell(infoCell *schema.InfoCell) (bool, error) {
+func (s *StoragePG) UpdateInfoCell(infoCell schema.InfoCell) (bool, error) {
 	query := `
-		UPDATE info_cell
-		SET data_type = $1, data_size = $2, description = $3
-		WHERE id = $4
-	`
+			UPDATE info_cells
+			SET data_type = $1, data_size = $2, description = $3
+			WHERE id = $4
+		`
 
 	result, err := s.db.Exec(
 		context.Background(),
@@ -186,7 +248,7 @@ func (s *StoragePG) UpdateInfoCell(infoCell *schema.InfoCell) (bool, error) {
 }
 
 // AddData добавляет новые данные в базу данных.
-func (s *StoragePG) AddData(infoCell *schema.InfoCell, memoryCell *schema.MemoryCell) error {
+func (s *StoragePG) AddData(infoCell schema.InfoCell, memoryCell schema.MemoryCell) error {
 	tx, err := s.db.Begin(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -194,10 +256,10 @@ func (s *StoragePG) AddData(infoCell *schema.InfoCell, memoryCell *schema.Memory
 	defer tx.Rollback(context.Background())
 
 	infoInsertQuery := `
-		INSERT INTO info_cell (data_type, data_size, description, owner_id)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id
-	`
+			INSERT INTO info_cells (data_type, data_size, description, owner_id)
+			VALUES ($1, $2, $3, $4)
+			RETURNING id
+		`
 
 	var infoID int64
 	err = tx.QueryRow(
@@ -213,9 +275,9 @@ func (s *StoragePG) AddData(infoCell *schema.InfoCell, memoryCell *schema.Memory
 	}
 
 	memoryInsertQuery := `
-		INSERT INTO memory_cell (info_id, encrypted, key_value_pairs, binary_data, file_name)
-		VALUES ($1, $2, $3, $4, $5)
-	`
+			INSERT INTO memory_cells (info_id, encrypted, key_value_pairs, binary_data, file_name)
+			VALUES ($1, $2, $3, $4, $5)
+		`
 
 	_, err = tx.Exec(
 		context.Background(),
@@ -241,9 +303,9 @@ func (s *StoragePG) AddData(infoCell *schema.InfoCell, memoryCell *schema.Memory
 // DeleteData удаляет данные из базы данных на основе заданных InfoID.
 func (s *StoragePG) DeleteData(infoIDs []int64) (bool, error) {
 	query := `
-		DELETE FROM info_cell
-		WHERE id = ANY($1)
-	`
+			DELETE FROM info_cells
+			WHERE id = ANY($1)
+		`
 
 	result, err := s.db.Exec(context.Background(), query, infoIDs)
 	if err != nil {

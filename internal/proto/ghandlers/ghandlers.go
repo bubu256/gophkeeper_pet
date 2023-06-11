@@ -6,33 +6,24 @@ import (
 	"log"
 
 	"github.com/bubu256/gophkeeper_pet/config"
+	"github.com/bubu256/gophkeeper_pet/internal/goph"
 	pb "github.com/bubu256/gophkeeper_pet/internal/proto/pb" // Путь к сгенерированному файлу протокола
 
 	"google.golang.org/grpc"
 )
 
-// Goph - интерфейс бизнес логики приложения
-type Goph interface {
-	RegisterUser(ctx context.Context, request *pb.RegistrationRequest) (*pb.RegistrationResponse, error)
-	AuthenticateUser(ctx context.Context, request *pb.AuthenticationRequest) (*pb.AuthenticationResponse, error)
-	AuthorizeUser(ctx context.Context, request *pb.AuthorizationRequest) (*pb.AuthorizationResponse, error)
-	AddData(ctx context.Context, request *pb.AddDataRequest) (*pb.AddDataResponse, error)
-	RetrieveData(ctx context.Context, request *pb.RetrieveDataRequest) (*pb.RetrieveDataResponse, error)
-	GetInformation(ctx context.Context, request *pb.GetInformationRequest) (*pb.GetInformationResponse, error)
-}
-
 // HandlerService представляет собой структуру, реализующую интерфейсы сервера gRPC.
 type HandlerService struct {
 	pb.UnimplementedGophKeeperServiceServer
-	businessLogic Goph
-	cfg           config.ServerConfig
+	logic goph.Goph
+	cfg   config.ServerConfig
 }
 
 // New создает новый объект HandlerService и возвращает ссылку на grpc.Server.
-func New(serverConfig config.ServerConfig) *grpc.Server {
+func New(logic goph.Goph, serverConfig config.ServerConfig) *grpc.Server {
 	handler := &HandlerService{
-		// businessLogic: businessLogic,
-		cfg: serverConfig,
+		logic: logic,
+		cfg:   serverConfig,
 	}
 
 	server := grpc.NewServer()

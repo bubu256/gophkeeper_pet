@@ -9,7 +9,9 @@ import (
 
 	"github.com/bubu256/gophkeeper_pet/config"
 	"github.com/bubu256/gophkeeper_pet/internal/proto/ghandlers"
-	"github.com/bubu256/gophkeeper_pet/pkg/storage"
+	"github.com/bubu256/gophkeeper_pet/pkg/keeper"
+
+	"github.com/bubu256/gophkeeper_pet/internal/goph"
 
 	"github.com/joho/godotenv"
 )
@@ -21,12 +23,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("configuration loading failed %v", err)
 	}
-	db, err := storage.New(cfg)
+	storage, err := keeper.New(cfg)
 	if err != nil {
 		log.Fatalf("Storage creation failed %v", err)
 	}
+	logic := goph.New(storage, cfg)
 
-	server := ghandlers.New(cfg)
+	server := ghandlers.New(logic, cfg)
 
 	// Запуск сервера
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.Port))
