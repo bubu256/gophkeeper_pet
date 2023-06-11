@@ -17,6 +17,7 @@ type ServerConfig struct {
 // ClientConfig - конфигурация для клиента
 type ClientConfig struct {
 	ServerAddress string `env:"SERVER_ADDRESS"`
+	Port          string `env:"SERVER_PORT"`
 }
 
 // LoadFromEnv заполняет конфигурацию сервера из переменных окружения.

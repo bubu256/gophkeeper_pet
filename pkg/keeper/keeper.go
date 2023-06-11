@@ -72,9 +72,9 @@ func (s *StoragePG) GetUserByUsername(username string) (*schema.User, error) {
 		&user.Password,
 	)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
-		}
+		// if err == pgx.ErrNoRows {
+		// 	return user, nil
+		// }
 		return nil, fmt.Errorf("failed to scan row: %w", err)
 	}
 

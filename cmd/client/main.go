@@ -1,23 +1,38 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 
 	"github.com/bubu256/gophkeeper_pet/config"
-	"github.com/bubu256/gophkeeper_pet/internal/proto/pb" // Путь к сгенерированному файлу протокола
+	"github.com/bubu256/gophkeeper_pet/internal/proto/pb"
+	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
 
+type Client struct {
+	token  string
+	client pb.GophKeeperServiceClient
+	ctx    context.Context
+}
+
 func main() {
-	// Создание объекта конфигурации клиента
-	clientConfig := config.ClientConfig{
-		ServerAddress: "localhost:50051", // Адрес сервера gRPC
+	godotenv.Load()
+
+	cfg, err := config.GetClientConfig()
+	if err != nil {
+		log.Fatalf("configuration loading failed: %v", err)
 	}
 
-	// Установка соединения с сервером
-	conn, err := grpc.Dial(clientConfig.ServerAddress, grpc.WithInsecure())
+	srvAddress := strings.Join([]string{cfg.ServerAddress, cfg.Port}, ":")
+	conn, err := grpc.Dial(srvAddress, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("Failed to dial server: %v", err)
 	}
@@ -26,133 +41,146 @@ func main() {
 	// Создание клиента
 	client := pb.NewGophKeeperServiceClient(conn)
 
-	// Вызов методов сервера
-	// registrationResponse, err := registerUser(client)
-	// if err != nil {
-	// 	log.Fatalf("Failed to register user: %v", err)
-	// }
-	// log.Printf("Registration Response: %v", registrationResponse)
-
-	authenticationResponse, err := authenticateUser(client)
-	if err != nil {
-		log.Fatalf("Failed to authenticate user: %v", err)
+	cli := &Client{
+		client: client,
+		ctx:    context.Background(),
 	}
-	log.Printf("Authentication Response: %+v", authenticationResponse)
-	token := authenticationResponse.Token
 
-	// authorizationResponse, err := authorizeUser(client, authenticationResponse.Token)
-	// if err != nil {
-	// 	log.Fatalf("Failed to authorize user: %v", err)
-	// }
-	// log.Printf("Authorization Response: %+v", authorizationResponse.Success)
+	// Обработка сигналов для возможности выхода по запросу пользователя
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		fmt.Println("Выход из приложения")
+		os.Exit(0)
+	}()
 
-	addDataResponse, err := addData(client, token)
-	if err != nil {
-		log.Fatalf("Failed to add data: %v", err)
-	}
-	log.Printf("AddData Response: %+v", addDataResponse)
-
-	retrieveDataResponse, err := retrieveData(client, token)
-	if err != nil {
-		log.Printf("Failed to retrieve data: %v", err)
-	}
-	log.Printf("RetrieveData Response: %v", retrieveDataResponse)
-
-	getInformationResponse, err := getInformation(client, token)
-	if err != nil {
-		log.Printf("Failed to get information: %v", err)
-	}
-	log.Printf("GetInformation Response: %v", getInformationResponse)
+	// Запуск интерактивного меню
+	cli.runMenu()
 }
 
-func registerUser(client pb.GophKeeperServiceClient) (*pb.RegistrationResponse, error) {
+func (c *Client) runMenu() {
+	for {
+		fmt.Println("Меню:  1. Регистрация;  2. Авторизация;  3. Получение информации;  4. Получение данных по InfoID;       0. Выход")
+
+		var choice string
+		fmt.Print("Выберите пункт меню: ")
+		fmt.Scanln(&choice)
+
+		switch choice {
+		case "1":
+			c.register()
+		case "2":
+			c.authenticate()
+		case "3":
+			c.retrieveInformation()
+		case "4":
+			c.retrieveDataByID()
+		case "0":
+			fmt.Println("Выход из приложения")
+			os.Exit(0)
+		default:
+			fmt.Println("Некорректный выбор")
+		}
+
+		fmt.Println()
+	}
+}
+
+func (c *Client) register() {
+	// запрос данных у пользователя
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Введите логин: ")
+	username, err := reader.ReadString('\n')
+	if err != nil {
+		log.Fatalf("Ошибка при чтении логина: %v", err)
+	}
+	username = strings.TrimSpace(username)
+
+	fmt.Print("Введите пароль: ")
+	password, err := reader.ReadString('\n')
+	if err != nil {
+		log.Fatalf("Ошибка при чтении пароля: %v", err)
+	}
+	password = strings.TrimSpace(password)
+
+	// создание запроса регистрации
 	request := &pb.RegistrationRequest{
-		Username: "test_user",
-		Password: "234",
+		Username: username,
+		Password: password,
 	}
 
-	response, err := client.Register(context.Background(), request)
+	// отправка запроса на сервер
+	response, err := c.client.Register(c.ctx, request)
 	if err != nil {
-		return nil, err
+		log.Fatalf("Ошибка при отправке запроса регистрации: %v", err)
 	}
 
-	return response, nil
+	// вывод информации о результате
+	if response.Success {
+		fmt.Println("Регистрация прошла успешно.")
+	} else {
+		fmt.Println("Ошибка при регистрации.")
+	}
 }
 
-func authenticateUser(client pb.GophKeeperServiceClient) (*pb.AuthenticationResponse, error) {
+func (c *Client) authenticate() {
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Введите логин: ")
+	username, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Println("Ошибка чтения ввода пользователя:", err)
+		return
+	}
+	username = strings.TrimSpace(username)
+
+	fmt.Print("Введите пароль: ")
+	password, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Println("Ошибка чтения ввода пользователя:", err)
+		return
+	}
+	password = strings.TrimSpace(password)
+
 	request := &pb.AuthenticationRequest{
-		Username: "test_user",
-		Password: "234",
+		Username: username,
+		Password: password,
 	}
 
-	response, err := client.Authenticate(context.Background(), request)
+	response, err := c.client.Authenticate(c.ctx, request)
 	if err != nil {
-		return nil, err
+		fmt.Println("Ошибка при аутентификации:", err)
+		return
 	}
 
-	return response, nil
+	c.token = response.Token
+	c.ctx = SetTokenContext(c.ctx, c.token)
+
+	fmt.Println("Аутентификация прошла успешно.")
 }
 
-func authorizeUser(client pb.GophKeeperServiceClient, token string) (*pb.AuthorizationResponse, error) {
-	request := &pb.AuthorizationRequest{
-		Token: token,
+func (c *Client) retrieveInformation() {
+	if c.token == "" {
+		fmt.Println("Необходима авторизация")
+		return
 	}
 
-	response, err := client.Authorize(SetTokenContext(context.Background(), token), request)
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
+	// Логика получения информации о сохраненных данных
+	// Используйте методы клиента (c.client) и контекст (c.ctx) для вызова gRPC-запросов
+	// Обработка ошибок и вывод результатов
 }
 
-func addData(client pb.GophKeeperServiceClient, token string) (*pb.AddDataResponse, error) {
-	request := &pb.AddDataRequest{
-		Data: &pb.MemoryCell{
-			Info: &pb.InfoCell{
-				Id:          1320947,
-				DataType:    "sample-data-type",
-				DataSize:    1024,
-				Description: "Sample data description",
-				OwnerId:     1,
-			},
-			Encrypted:     false,
-			KeyValuePairs: map[string]string{"login": "value1", "password": "value2"},
-			BinaryData:    []byte("sample-binary-data"),
-			FileName:      "sample-file-name",
-		},
+func (c *Client) retrieveDataByID() {
+	if c.token == "" {
+		fmt.Println("Необходима авторизация")
+		return
 	}
 
-	response, err := client.AddData(SetTokenContext(context.Background(), token), request)
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
-func retrieveData(client pb.GophKeeperServiceClient, token string) (*pb.RetrieveDataResponse, error) {
-	request := &pb.RetrieveDataRequest{
-		Ids: []int64{140},
-	}
-
-	response, err := client.RetrieveData(SetTokenContext(context.Background(), token), request)
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
-func getInformation(client pb.GophKeeperServiceClient, token string) (*pb.GetInformationResponse, error) {
-	request := &pb.GetInformationRequest{}
-
-	response, err := client.GetInformation(SetTokenContext(context.Background(), token), request)
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
+	// Логика получения данных по введенному InfoID
+	// Используйте методы клиента (c.client) и контекст (c.ctx) для вызова gRPC-запросов
+	// Обработка ошибок и вывод результатов
 }
 
 func SetTokenContext(ctx context.Context, token string) context.Context {

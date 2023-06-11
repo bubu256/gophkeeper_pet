@@ -140,6 +140,7 @@ func (g *GophLogic) GetUserID(username string) (int64, error) {
 // Возвращает токен или ошибку, если аутентификация не удалась.
 func (g *GophLogic) Authenticate(username, password string) (string, error) {
 	user, err := g.keeper.GetUserByUsername(username)
+	// log.Println(user, err)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve user: %w", err)
 	}

@@ -65,6 +65,7 @@ func (h *HandlerService) Register(ctx context.Context, request *pb.RegistrationR
 // Authenticate реализует метод Authenticate интерфейса GophKeeperServiceServer.
 func (h *HandlerService) Authenticate(ctx context.Context, request *pb.AuthenticationRequest) (*pb.AuthenticationResponse, error) {
 	token, err := h.gophKeeper.Authenticate(request.Username, request.Password)
+	// log.Println(token, err)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Authentication failed: %v", err)
 	}
