@@ -31,31 +31,32 @@ message AuthorizationResponse {
 }
 
 message InfoCell {
-  int32 id = 1;
+  int64 id = 1;
   string dataType = 2;
   int32 dataSize = 3;
   string description = 4;
-  string ownerId = 5;
+  int64 ownerId = 5;
 }
 
 message MemoryCell {
-  InfoCell info = 1;
-  bool encrypted = 2;
-  map<string, string> keyValuePairs = 3;
-  bytes binaryData = 4;
-  string fileName = 5;
+  int64 id = 1;
+  InfoCell info = 2;
+  bool encrypted = 3;
+  map<string, string> keyValuePairs = 4;
+  bytes binaryData = 5;
+  string fileName = 6;
 }
 
 message AddDataRequest {
-  repeated MemoryCell data = 1;
+  MemoryCell data = 1;
 }
 
 message AddDataResponse {
-  repeated int32 id = 1;
+  int64 id = 1;
 }
 
 message RetrieveDataRequest {
-  repeated int32 id = 1;
+  repeated int64 ids = 1;
 }
 
 message RetrieveDataResponse {

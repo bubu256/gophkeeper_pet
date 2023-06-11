@@ -18,7 +18,7 @@ type Keeper interface {
 	GetDataByInfoIDs(infoIDs []int64) ([]*schema.MemoryCell, error)
 	UpdateMemoryCell(memoryCell schema.MemoryCell) (bool, error)
 	UpdateInfoCell(infoCell schema.InfoCell) (bool, error)
-	AddData(infoCell schema.InfoCell, memoryCell schema.MemoryCell) error
+	AddData(infoCell schema.InfoCell, memoryCell *schema.MemoryCell) (int64, error)
 	DeleteData(infoIDs []int64) (bool, error)
 	GetUserByUsername(username string) (*schema.User, error)
 	CreateUser(user *schema.User) error
@@ -58,7 +58,7 @@ func New(cfg config.ServerConfig) (*StoragePG, error) {
 // GetUserByUsername возвращает пользователя по его имени пользователя (username).
 func (s *StoragePG) GetUserByUsername(username string) (*schema.User, error) {
 	query := `
-			SELECT id, username, password
+			SELECT id, username, password_hash
 			FROM users
 			WHERE username = $1
 		`
@@ -84,7 +84,7 @@ func (s *StoragePG) GetUserByUsername(username string) (*schema.User, error) {
 // CreateUser создает нового пользователя.
 func (s *StoragePG) CreateUser(user *schema.User) error {
 	query := `
-			INSERT INTO users (username, password)
+			INSERT INTO users (username, password_hash)
 			VALUES ($1, $2)
 			RETURNING id
 		`
@@ -248,56 +248,37 @@ func (s *StoragePG) UpdateInfoCell(infoCell schema.InfoCell) (bool, error) {
 }
 
 // AddData добавляет новые данные в базу данных.
-func (s *StoragePG) AddData(infoCell schema.InfoCell, memoryCell schema.MemoryCell) error {
-	tx, err := s.db.Begin(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback(context.Background())
-
-	infoInsertQuery := `
+func (s *StoragePG) AddData(infoCell schema.InfoCell, memoryCell *schema.MemoryCell) (int64, error) {
+	insertQuery := `
+		WITH inserted_info AS (
 			INSERT INTO info_cells (data_type, data_size, description, owner_id)
 			VALUES ($1, $2, $3, $4)
 			RETURNING id
-		`
-
+		)
+		INSERT INTO memory_cells (info_id, encrypted, key_value_pairs, binary_data, file_name)
+		SELECT id, $5, $6, $7, $8
+		FROM inserted_info
+		RETURNING info_id
+	`
+	// log.Printf("infoCell.OwnerID %v", infoCell.OwnerID)
 	var infoID int64
-	err = tx.QueryRow(
+	err := s.db.QueryRow(
 		context.Background(),
-		infoInsertQuery,
+		insertQuery,
 		infoCell.DataType,
 		infoCell.DataSize,
 		infoCell.Description,
 		infoCell.OwnerID,
-	).Scan(&infoID)
-	if err != nil {
-		return fmt.Errorf("failed to execute info insert query: %w", err)
-	}
-
-	memoryInsertQuery := `
-			INSERT INTO memory_cells (info_id, encrypted, key_value_pairs, binary_data, file_name)
-			VALUES ($1, $2, $3, $4, $5)
-		`
-
-	_, err = tx.Exec(
-		context.Background(),
-		memoryInsertQuery,
-		infoID,
 		memoryCell.Encrypted,
 		memoryCell.KeyValuePairs,
 		memoryCell.BinaryData,
 		memoryCell.FileName,
-	)
+	).Scan(&infoID)
 	if err != nil {
-		return fmt.Errorf("failed to execute memory insert query: %w", err)
+		return 0, fmt.Errorf("failed to execute insert query: %w", err)
 	}
 
-	err = tx.Commit(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return infoID, nil
 }
 
 // DeleteData удаляет данные из базы данных на основе заданных InfoID.

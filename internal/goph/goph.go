@@ -1,15 +1,13 @@
 package goph
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
-	"errors"
+	"encoding/hex"
 	"fmt"
-
-	"golang.org/x/crypto/bcrypt"
 
 	"github.com/bubu256/gophkeeper_pet/config"
 	"github.com/bubu256/gophkeeper_pet/internal/schema"
@@ -18,13 +16,14 @@ import (
 
 // Goph представляет интерфейс для работы с бизнес-логикой приложения.
 type Goph interface {
-	GenerateToken(userID int64) ([]byte, error)
-	CheckToken(token []byte) (bool, error)
+	CheckToken(token string) (bool, error)
 	CreateUser(username, password string) error
-	Authenticate(username, password string) ([]byte, error)
-	SaveData(userID int64, memoryCell schema.MemoryCell) error
+	Authenticate(username, password string) (string, error)
+	SaveData(userID int64, memoryCell *schema.MemoryCell) (int64, error)
 	GetUserDataInfo(userID int64) ([]*schema.InfoCell, error)
 	GetUserMemoryData(userID int64, infoIDs []int64) ([]*schema.MemoryCell, error)
+	UserExists(username string) (bool, error)
+	GetUserIDFromToken(token string) (int64, error)
 }
 
 // GophLogic представляет реализацию интерфейса Goph.
@@ -32,6 +31,8 @@ type GophLogic struct {
 	secretKey []byte
 	keeper    keeper.Keeper
 }
+
+var _ Goph = &GophLogic{}
 
 // New создает новый экземпляр GophLogic с заданным Keeper и ServerConfig.
 // Генерирует случайный секретный ключ.
@@ -49,75 +50,66 @@ func New(keeper keeper.Keeper, config config.ServerConfig) *GophLogic {
 	}
 }
 
-// GenerateToken генерирует новый токен на основе ID пользователя.
-// В первых двух байтах токена зашифрован ID пользователя, а остальная часть получена шифрованием ID с использованием секретного ключа.
-func (g *GophLogic) GenerateToken(userID int64) ([]byte, error) {
-	// Шифрование ID пользователя
-	idBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(idBytes, uint64(userID))
-
-	block, err := aes.NewCipher(g.secretKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cipher block: %w", err)
+// GenerateToken - генерирует токен из ID пользователя и секретного ключа
+func (g *GophLogic) GenerateToken(userID int64) (string, error) {
+	idBytes := make([]byte, 4)
+	if userID < 0 || userID > (1<<31-1) {
+		return "", fmt.Errorf("userID is out of range")
 	}
+	binary.BigEndian.PutUint32(idBytes, uint32(userID))
 
-	// Зашифрование ID
-	ciphertext := make([]byte, aes.BlockSize+len(idBytes))
-	iv := ciphertext[:aes.BlockSize]
-	_, err = rand.Read(iv)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate IV: %w", err)
-	}
+	h := hmac.New(sha256.New, g.secretKey)
+	h.Write(idBytes)
+	signature := h.Sum(nil)
 
-	stream := cipher.NewCTR(block, iv)
-	stream.XORKeyStream(ciphertext[aes.BlockSize:], idBytes)
-
-	return ciphertext, nil
+	token := append(idBytes, signature...)
+	return hex.EncodeToString(token), nil
 }
 
-// CheckToken проверяет корректность токена.
-// Извлекает ID пользователя из токена и проверяет, что остаток токена соответствует шифрованному ID.
-func (g *GophLogic) CheckToken(token []byte) (bool, error) {
-	if len(token) < 2+aes.BlockSize {
-		return false, errors.New("invalid token length")
-	}
-
-	block, err := aes.NewCipher(g.secretKey)
+// CheckToken - проверяет токен на подлинность
+func (g *GophLogic) CheckToken(token string) (bool, error) {
+	decodeToken, err := hex.DecodeString(token)
 	if err != nil {
-		return false, fmt.Errorf("failed to create cipher block: %w", err)
+		return false, err
+	}
+	idUser := decodeToken[:4]
+	sing := decodeToken[4:]
+	h := hmac.New(sha256.New, g.secretKey)
+	h.Write(idUser)
+	dst := h.Sum(nil)
+	return hmac.Equal(sing, dst), nil
+}
+
+// GetUserIDFromToken - получает ID пользователя из токена.
+func (g *GophLogic) GetUserIDFromToken(token string) (int64, error) {
+	decodedToken, err := hex.DecodeString(token)
+	if err != nil {
+		return 0, err
 	}
 
-	iv := token[2 : 2+aes.BlockSize]
-	encryptedID := token[2+aes.BlockSize:]
+	if len(decodedToken) < 4 {
+		return 0, fmt.Errorf("invalid token length")
+	}
 
-	stream := cipher.NewCTR(block, iv)
-	decryptedID := make([]byte, len(encryptedID))
-	stream.XORKeyStream(decryptedID, encryptedID)
+	idBytes := decodedToken[:4]
+	userID := binary.BigEndian.Uint32(idBytes)
 
-	id := int64(binary.LittleEndian.Uint64(decryptedID))
-	rest := token[2+aes.BlockSize:]
-	encryptedRest := make([]byte, len(rest))
-	stream.XORKeyStream(encryptedRest, rest)
-
-	return id == int64(binary.LittleEndian.Uint64(encryptedRest)), nil
+	return int64(userID), nil
 }
 
 // CreateUser создает нового пользователя.
 // Хеширует логин и вызывает метод Keeper для сохранения пользователя.
 func (g *GophLogic) CreateUser(username, password string) error {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return fmt.Errorf("failed to hash password: %w", err)
-	}
+	hashedPassword := hashPassword(password)
 
-	hashedUsername := hashUsername(username)
+	// hashedUsername := hashUsername(username)
 
 	user := &schema.User{
-		Username: hashedUsername,
-		Password: string(hashedPassword),
+		Username: username,
+		Password: hashedPassword,
 	}
 
-	err = g.keeper.CreateUser(user)
+	err := g.keeper.CreateUser(user)
 	if err != nil {
 		return fmt.Errorf("failed to save user: %w", err)
 	}
@@ -125,20 +117,35 @@ func (g *GophLogic) CreateUser(username, password string) error {
 	return nil
 }
 
+// ExistUser - проверяет существует ли пользователь
+func (g *GophLogic) UserExists(username string) (bool, error) {
+	user, err := g.keeper.GetUserByUsername(username)
+	if err != nil {
+		return false, err
+	}
+	return user != nil, nil
+}
+
+// GetUserID - возвращает ID пользователя
+func (g *GophLogic) GetUserID(username string) (int64, error) {
+	user, err := g.keeper.GetUserByUsername(username)
+	if err != nil {
+		return 0, err
+	}
+	return user.ID, nil
+}
+
 // Authenticate выполняет аутентификацию пользователя.
 // Хеширует пароль и проверяет его с хранимым хешем в Keeper.
 // Возвращает токен или ошибку, если аутентификация не удалась.
-func (g *GophLogic) Authenticate(username, password string) ([]byte, error) {
-	hashedUsername := hashUsername(username)
-
-	user, err := g.keeper.GetUserByUsername(hashedUsername)
+func (g *GophLogic) Authenticate(username, password string) (string, error) {
+	user, err := g.keeper.GetUserByUsername(username)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve user: %w", err)
+		return "", fmt.Errorf("failed to retrieve user: %w", err)
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
-	if err != nil {
-		return nil, fmt.Errorf("authentication failed: %w", err)
+	if hashPassword(password) != user.Password {
+		return "", fmt.Errorf("authentication failed: %w", err)
 	}
 
 	return g.GenerateToken(user.ID)
@@ -146,14 +153,15 @@ func (g *GophLogic) Authenticate(username, password string) ([]byte, error) {
 
 // SaveData сохраняет новые данные для пользователя.
 // Вызывает соответствующий метод Keeper для записи данных в базу данных.
-func (g *GophLogic) SaveData(userID int64, memoryCell schema.MemoryCell) error {
+func (g *GophLogic) SaveData(userID int64, memoryCell *schema.MemoryCell) (int64, error) {
 	memoryCell.InfoCell.OwnerID = userID
-	err := g.keeper.AddData(*memoryCell.InfoCell, memoryCell)
+	// log.Printf("infoCell: %+v", memoryCell.InfoCell)
+	infoID, err := g.keeper.AddData(*memoryCell.InfoCell, memoryCell)
 	if err != nil {
-		return fmt.Errorf("failed to save memory cell: %w", err)
+		return infoID, fmt.Errorf("failed to save memory cell: %w", err)
 	}
 
-	return nil
+	return infoID, nil
 }
 
 // GetUserData возвращает информацию о данных пользователя.
@@ -202,7 +210,7 @@ func (g *GophLogic) GetUserMemoryData(userID int64, infoIDs []int64) ([]*schema.
 }
 
 // hashUsername хеширует логин пользователя.
-func hashUsername(username string) string {
+func hashPassword(username string) string {
 	hashedUsername := sha256.Sum256([]byte(username))
-	return string(hashedUsername[:])
+	return base64.URLEncoding.EncodeToString(hashedUsername[:])
 }
