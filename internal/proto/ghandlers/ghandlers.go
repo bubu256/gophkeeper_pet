@@ -3,12 +3,11 @@ package ghandlers
 
 import (
 	"context"
-	"log"
 	"path/filepath"
 
 	"github.com/bubu256/gophkeeper_pet/config"
 	"github.com/bubu256/gophkeeper_pet/internal/goph"
-	pb "github.com/bubu256/gophkeeper_pet/internal/proto/pb" // Путь к сгенерированному файлу протокола
+	pb "github.com/bubu256/gophkeeper_pet/internal/proto/pb"
 	"github.com/bubu256/gophkeeper_pet/internal/schema"
 	"golang.org/x/exp/slices"
 
@@ -160,7 +159,7 @@ func (h *HandlerService) RetrieveData(ctx context.Context, request *pb.RetrieveD
 
 	infoIDs := request.Ids
 	data, err := h.gophKeeper.GetUserMemoryData(usedID, infoIDs)
-	log.Println(len(data))
+	// log.Println(len(data))
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to retrieve data: %v", err)
 	}

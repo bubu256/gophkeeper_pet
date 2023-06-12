@@ -182,7 +182,7 @@ func (s *StoragePG) GetDataByInfoIDs(infoIDs []int64) ([]*schema.MemoryCell, err
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
-
+		infoCell.ID = memoryCell.InfoID
 		memoryCell.InfoCell = infoCell
 		memoryCells = append(memoryCells, memoryCell)
 	}
