@@ -17,21 +17,24 @@ import (
 )
 
 func main() {
+	// загружаем переменные .env
 	godotenv.Load()
-
+	// формируем конфигурацию сервера
 	cfg, err := config.GetServerConfig()
 	if err != nil {
 		log.Fatalf("configuration loading failed %v", err)
 	}
+	// подключаемся к хранилищу
 	storage, err := keeper.New(cfg)
 	if err != nil {
 		log.Fatalf("Storage creation failed %v", err)
 	}
+	// создаем сктруктуру управляющую бизнес логикой приложения
 	logic := goph.New(storage, cfg)
-
+	// создаем обработчик grpc методов
 	server := ghandlers.New(logic, cfg)
 
-	// Запуск сервера
+	// Запуск сервера tcp
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.Port))
 	if err != nil {
 		log.Fatalf("Failed to listen on port %s: %v", cfg.Port, err)

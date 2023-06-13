@@ -100,7 +100,7 @@ func (g *GophLogic) GetUserIDFromToken(token string) (int64, error) {
 }
 
 // CreateUser создает нового пользователя.
-// Хеширует логин и вызывает метод Keeper для сохранения пользователя.
+// Хеширует логин и вызывает метод Keeper.CreateUser для сохранения пользователя.
 func (g *GophLogic) CreateUser(username, password string) error {
 	hashedPassword := hashPassword(password)
 
@@ -140,7 +140,6 @@ func (g *GophLogic) GetUserID(username string) (int64, error) {
 // Возвращает токен или ошибку, если аутентификация не удалась.
 func (g *GophLogic) Authenticate(username, password string) (string, error) {
 	user, err := g.keeper.GetUserByUsername(username)
-	// log.Println(user, err)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve user: %w", err)
 	}
@@ -155,7 +154,7 @@ func (g *GophLogic) Authenticate(username, password string) (string, error) {
 // SaveData сохраняет новые данные для пользователя.
 func (g *GophLogic) SaveData(userID int64, memoryCell *schema.MemoryCell) (int64, error) {
 	memoryCell.InfoCell.OwnerID = userID
-	// log.Printf("infoCell: %+v", memoryCell.InfoCell)
+	memoryCell.InfoCell.DataSize = int32(len(memoryCell.BinaryData))
 	infoID, err := g.keeper.AddData(*memoryCell.InfoCell, memoryCell)
 	if err != nil {
 		return infoID, fmt.Errorf("failed to save memory cell: %w", err)

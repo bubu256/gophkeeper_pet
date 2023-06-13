@@ -1,3 +1,4 @@
+// Package keeper - реализует хранение данных пользователей приложения
 package keeper
 
 import (
@@ -264,7 +265,7 @@ func (s *StoragePG) AddData(infoCell schema.InfoCell, memoryCell *schema.MemoryC
 		FROM inserted_info
 		RETURNING info_id
 	`
-	// log.Printf("infoCell.OwnerID %v", infoCell.OwnerID)
+
 	var infoID int64
 	err := s.db.QueryRow(
 		context.Background(),

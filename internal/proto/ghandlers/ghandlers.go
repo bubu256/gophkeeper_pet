@@ -37,7 +37,7 @@ func New(logic goph.Goph, serverConfig config.ServerConfig) *grpc.Server {
 	return server
 }
 
-// Register реализует метод Register интерфейса GophKeeperServiceServer.
+// Register реализует метод регистрации пользователя
 func (h *HandlerService) Register(ctx context.Context, request *pb.RegistrationRequest) (*pb.RegistrationResponse, error) {
 	// Проверка, что пользователь с указанным именем не существует
 	exists, err := h.gophKeeper.UserExists(request.Username)
@@ -61,10 +61,9 @@ func (h *HandlerService) Register(ctx context.Context, request *pb.RegistrationR
 	return response, nil
 }
 
-// Authenticate реализует метод Authenticate интерфейса GophKeeperServiceServer.
+// Authenticate реализует метод аутентификации пользователя
 func (h *HandlerService) Authenticate(ctx context.Context, request *pb.AuthenticationRequest) (*pb.AuthenticationResponse, error) {
 	token, err := h.gophKeeper.Authenticate(request.Username, request.Password)
-	// log.Println(token, err)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Authentication failed: %v", err)
 	}
@@ -76,6 +75,7 @@ func (h *HandlerService) Authenticate(ctx context.Context, request *pb.Authentic
 	return response, nil
 }
 
+// Authorize реализует метод авторизации пользователя
 func (h *HandlerService) Authorize(ctx context.Context, request *pb.AuthorizationRequest) (*pb.AuthorizationResponse, error) {
 	valid, err := h.gophKeeper.CheckToken(request.Token)
 	if err != nil {
@@ -89,10 +89,8 @@ func (h *HandlerService) Authorize(ctx context.Context, request *pb.Authorizatio
 	return response, nil
 }
 
-// AddData реализует метод AddData интерфейса GophKeeperServiceServer.
+// AddData реализует метод добавлению данных пользователя
 func (h *HandlerService) AddData(ctx context.Context, request *pb.AddDataRequest) (*pb.AddDataResponse, error) {
-	// log.Println("Received AddData request")
-	// log.Printf("Data: %v", request.Data)
 	token, ok := GetTokenFromContext(ctx)
 	if !ok {
 		return nil, status.Errorf(codes.Unauthenticated, "No token in context")
@@ -114,10 +112,9 @@ func (h *HandlerService) AddData(ctx context.Context, request *pb.AddDataRequest
 	return response, nil
 }
 
-// GetInformation реализует метод GetInformation интерфейса GophKeeperServiceServer.
+// GetInformation реализует метод получения метаинформации о данных пользователя
 func (h *HandlerService) GetInformation(ctx context.Context, request *pb.GetInformationRequest) (*pb.GetInformationResponse, error) {
-	// log.Println("Received GetInformation request")
-	// log.Printf("Info ID: %v", request.Id)
+
 	token, ok := GetTokenFromContext(ctx)
 	if !ok {
 		return nil, status.Errorf(codes.Unauthenticated, "No token in context")
@@ -144,10 +141,8 @@ func (h *HandlerService) GetInformation(ctx context.Context, request *pb.GetInfo
 	return response, nil
 }
 
-// RetrieveData реализует метод RetrieveData интерфейса GophKeeperServiceServer.
+// RetrieveData реализует метод получения данных пользователя.
 func (h *HandlerService) RetrieveData(ctx context.Context, request *pb.RetrieveDataRequest) (*pb.RetrieveDataResponse, error) {
-	// log.Println("Received RetrieveData request")
-	// log.Printf("Data ID: %v", request.Id)
 	token, ok := GetTokenFromContext(ctx)
 	if !ok {
 		return nil, status.Errorf(codes.Unauthenticated, "No token in context")
