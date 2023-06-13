@@ -365,7 +365,7 @@ func (c *Cli) Dump() {
 	}
 }
 
-// SetTokenContext - устанавливает токен в контект
+// SetTokenContext - устанавливает токен в контекcт
 func SetTokenContext(ctx context.Context, token string) context.Context {
 	md := metadata.New(map[string]string{"token": token})
 	return metadata.NewOutgoingContext(ctx, md)
