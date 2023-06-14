@@ -52,6 +52,11 @@ func New(keeper keeper.Keeper, config config.ServerConfig) *GophLogic {
 	}
 }
 
+// SetSecretKey устанавливает секретный ключ для GophLogic.
+func (g *GophLogic) SetSecretKey(secretKey []byte) {
+	g.secretKey = secretKey
+}
+
 // GenerateToken - генерирует токен из ID пользователя и секретного ключа
 func (g *GophLogic) GenerateToken(userID int64) (string, error) {
 	idBytes := make([]byte, 4)
@@ -102,7 +107,7 @@ func (g *GophLogic) GetUserIDFromToken(token string) (int64, error) {
 // CreateUser создает нового пользователя.
 // Хеширует логин и вызывает метод Keeper.CreateUser для сохранения пользователя.
 func (g *GophLogic) CreateUser(username, password string) error {
-	hashedPassword := hashPassword(password)
+	hashedPassword := HashPassword(password)
 
 	user := &schema.User{
 		Username: username,
@@ -144,7 +149,7 @@ func (g *GophLogic) Authenticate(username, password string) (string, error) {
 		return "", fmt.Errorf("failed to retrieve user: %w", err)
 	}
 
-	if hashPassword(password) != user.Password {
+	if HashPassword(password) != user.Password {
 		return "", fmt.Errorf("authentication failed: %w", err)
 	}
 
@@ -213,7 +218,7 @@ func (g *GophLogic) GetUserMemoryData(userID int64, infoIDs []int64) ([]*schema.
 }
 
 // hashUsername хеширует логин пользователя.
-func hashPassword(username string) string {
+func HashPassword(username string) string {
 	hashedUsername := sha256.Sum256([]byte(username))
 	return base64.URLEncoding.EncodeToString(hashedUsername[:])
 }

@@ -25,7 +25,7 @@ type Storage struct {
 
 // NewStorage - возвращает экземпляр хранилища
 func NewStorage() *Storage {
-	dirPath, err := createAppDirectory("gophkeeper")
+	dirPath, err := CreateAppDirectory("gophkeeper")
 	if err != nil {
 		log.Printf("failed application directory creation %v", err)
 	}
@@ -60,6 +60,11 @@ func (s *Storage) GetDataByID(infoID int64) (*pb.MemoryCell, error) {
 	return nil, errors.New("data not found")
 }
 
+// Получить данные по ID: возвращает pb.MemoryCell по указанному InfoID.
+func (s *Storage) GetData() []*pb.MemoryCell {
+	return s.data
+}
+
 // Сделать дамп на диск: шифрует данные и сохраняет их в файл на диске.
 func (s *Storage) DumpToFile(password string) error {
 	// Преобразование данных в бинарный формат
@@ -69,10 +74,10 @@ func (s *Storage) DumpToFile(password string) error {
 	}
 
 	// Генерация ключа из пароля
-	key := generateKeyFromPassword(password)
+	key := GenerateKeyFromPassword(password)
 
 	// Шифрование данных
-	encryptedData, err := encrypt(data, key)
+	encryptedData, err := Encrypt(data, key)
 	if err != nil {
 		return errors.Wrap(err, "failed to encrypt data")
 	}
@@ -102,10 +107,10 @@ func (s *Storage) LoadFromDump(password string) error {
 	}
 
 	// Генерация ключа из пароля
-	key := generateKeyFromPassword(password)
+	key := GenerateKeyFromPassword(password)
 
 	// Расшифровка данных
-	decryptedData, err := decrypt(encryptedData, key)
+	decryptedData, err := Decrypt(encryptedData, key)
 	if err != nil {
 		return errors.Wrap(err, "failed to decrypt data")
 	}
@@ -124,13 +129,13 @@ func (s *Storage) LoadFromDump(password string) error {
 }
 
 // Функция для генерации ключа из пароля
-func generateKeyFromPassword(password string) []byte {
+func GenerateKeyFromPassword(password string) []byte {
 	hash := sha256.Sum256([]byte(password))
 	return hash[:32]
 }
 
-// encrypt шифрует данные с использованием AES и указанного ключа.
-func encrypt(data, key []byte) ([]byte, error) {
+// Encrypt шифрует данные с использованием AES и указанного ключа.
+func Encrypt(data, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -152,8 +157,8 @@ func encrypt(data, key []byte) ([]byte, error) {
 	return ciphertext, nil
 }
 
-// decrypt дешифрует данные с использованием AES и указанного ключа.
-func decrypt(ciphertext, key []byte) ([]byte, error) {
+// Decrypt дешифрует данные с использованием AES и указанного ключа.
+func Decrypt(ciphertext, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -179,8 +184,8 @@ func decrypt(ciphertext, key []byte) ([]byte, error) {
 	return plaintext, nil
 }
 
-// createAppDirectory - создает директорию приложения для хранения дампа. Возвращает путь к будущему дампу.
-func createAppDirectory(dirName string) (string, error) {
+// CreateAppDirectory - создает директорию приложения для хранения дампа. Возвращает путь к будущему дампу.
+func CreateAppDirectory(dirName string) (string, error) {
 	// Получаем путь к директории пользователя
 	userDir, err := os.UserHomeDir()
 	if err != nil {
