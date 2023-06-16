@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package pb;
+
+option go_package = "internal/proto/pb";
+
+message RegistrationRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message RegistrationResponse {
+  bool success = 1;
+}
+
+message AuthenticationRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message AuthenticationResponse {
+  string token = 1;
+}
+
+message AuthorizationRequest {
+  string token = 1;
+}
+
+message AuthorizationResponse {
+  bool success = 1;
+}
+
+message InfoCell {
+  int64 id = 1;
+  string dataType = 2;
+  int32 dataSize = 3;
+  string description = 4;
+  int64 ownerId = 5;
+}
+
+message MemoryCell {
+  int64 id = 1;
+  InfoCell info = 2;
+  bool encrypted = 3;
+  map<string, string> keyValuePairs = 4;
+  bytes binaryData = 5;
+  string fileName = 6;
+}
+
+message AddDataRequest {
+  MemoryCell data = 1;
+}
+
+message AddDataResponse {
+  int64 id = 1;
+}
+
+message RetrieveDataRequest {
+  repeated int64 ids = 1;
+}
+
+message RetrieveDataResponse {
+  repeated MemoryCell data = 1;
+}
+
+message GetInformationRequest {}
+
+message GetInformationResponse {
+  repeated InfoCell info = 1;
+}
+
+service GophKeeperService {
+  rpc Register(RegistrationRequest) returns (RegistrationResponse) {}
+  rpc Authenticate(AuthenticationRequest) returns (AuthenticationResponse) {}
+  rpc Authorize(AuthorizationRequest) returns (AuthorizationResponse) {}
+  rpc AddData(AddDataRequest) returns (AddDataResponse) {}
+  rpc RetrieveData(RetrieveDataRequest) returns (RetrieveDataResponse) {}
+  rpc GetInformation(GetInformationRequest) returns (GetInformationResponse) {}
+}
